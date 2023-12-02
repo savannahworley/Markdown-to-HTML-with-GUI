@@ -89,3 +89,6 @@ sr (Ast : Ast : Ast : ts) q = sr (PMD (HorizontalRule) : ts) q
 sr (UndScore : UndScore : UndScore : ts) q = sr (PMD (HorizontalRule) : ts) q 
 sr (Dash : Dash : Dash : ts) q = sr (PMD (HorizontalRule) : ts) q 
 sr (RPar : ContentText t : LPar : RBra : ContentText tx : LBra : ts) q = sr (PMD (Image tx t) : ts) q
+sr (Err e : ts) q = [Err e]
+sr ts (x:q) = sr (x:ts) q
+sr ts [] = ts

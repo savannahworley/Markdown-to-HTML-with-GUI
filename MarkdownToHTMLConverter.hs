@@ -54,7 +54,7 @@ parseNum xs =
 
 parser :: [Token] -> Either Elements String 
 parser s = case result of 
-    [PT term] -> Left term
+    [PMD element] -> Left element
     [Err e] -> Right e
     _ -> Right $ "Parse error: " ++ show s
     where

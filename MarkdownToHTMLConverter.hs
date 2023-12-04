@@ -22,7 +22,8 @@ data Elements = H1 Text | H2 Text | H3 Text
 
 lexer :: String -> [Token]
 lexer "" = []
-lexer ('#' : xs) = parseHash('#':xs) : lexer xs 
+lexer ('#' : xs) = x : lexer (drop y xs)
+    where (x, y) = parseHash ('#':xs)
 lexer ('.' : xs) = Dot : lexer xs
 lexer ('-' : xs) = Dash : lexer xs 
 lexer ('+' : xs) = Plus : lexer xs 
@@ -55,16 +56,16 @@ parseNum xs =
       ('.':ys) -> (x ++ "." ++ y , z)       where (y,z) = span isDigit ys
       _        -> (x,x')
 
-parseHash :: String -> Token
+parseHash :: String -> (Token, Int)
 parseHash s = 
     let (x, y) = span (== '#') s
     in case length x of
-        1 -> Hash
-        2 -> Hash2
-        3 -> Hash3
-        4 -> Hash4
-        5 -> Hash5
-        6 -> Hash6
+        1 -> (Hash, 0)
+        2 -> (Hash2, 1)
+        3 -> (Hash3, 2)
+        4 -> (Hash4, 3)
+        5 -> (Hash5, 4)
+        6 -> (Hash6, 5)
 
 parser :: [Token] -> Either Elements String 
 parser s = case result of 

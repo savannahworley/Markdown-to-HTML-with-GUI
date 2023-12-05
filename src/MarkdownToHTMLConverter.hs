@@ -19,7 +19,7 @@ data Elements = H1 Text | H2 Text | H3 Text
     | LnBreak | Bold Text | Italic Text | BoldAndItalic Text 
     | Blockquote Text | OrderedList [Text] | ListItem 
     | UnorderedList [Text] | Code Text | Image Text Text
-    | HorizontalRule | Link Text Text
+    | HorizontalRule | Link Text Text | Block [Token]
     deriving (Eq, Show)
 
 lexer :: String -> [Token]
@@ -110,3 +110,8 @@ sr (RPar : ContentText t : LPar : RBra : ContentText tx : LBra : ts) q = sr (PMD
 sr (Err e : ts) q = [Err e]
 sr ts (x:q) = sr (x:ts) q
 sr ts [] = ts
+
+converter :: String -> [Token] -> String 
+converter "" = []
+converter s (PMD (H1 t) : xs) = s ++ "<h1>" ++ t ++ "<\h1>" : converter s xs
+converter s (PMD (H1 t) : xs) = s ++ "<h2>" ++ t ++ "<\h2>" : converter s xs

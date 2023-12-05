@@ -1,3 +1,5 @@
+module MarkdownToHTMLConverter where
+
 import Data.Char
 
 type Text = String 
@@ -66,6 +68,7 @@ parseHash s =
         4 -> (Hash4, 3)
         5 -> (Hash5, 4)
         6 -> (Hash6, 5)
+        x -> (Err "too many/not enough hashmarks", 0)
 
 parser :: [Token] -> Either Elements String 
 parser s = case result of 

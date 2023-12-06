@@ -118,8 +118,8 @@ sr ts [] = ts
 
 converter :: String -> [Token] -> String 
 converter "" = []
-converter s (PMD (H1 t) : xs) = s ++ "<h1>" ++ t ++ "<\h1>" : converter s xs
-converter s (PMD (H1 t) : xs) = s ++ "<h2>" ++ t ++ "<\h2>" : converter s xs
+converter s (PMD (H1 t) : xs) = s ++ "<h1>" ++ t ++ "</h1>" : converter s xs
+converter s (PMD (H1 t) : xs) = s ++ "<h2>" ++ t ++ "</h2>" : converter s xs
 
 indentListHelper :: [Elements] -> [Elements] -> [Elements]
 indentListHelper [] ys = [OrderedList ys]

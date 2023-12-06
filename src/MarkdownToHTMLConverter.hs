@@ -1,15 +1,16 @@
 module MarkdownToHTMLConverter where
 
 import Data.Char
+import Data.Foldable
 
 type Text = String 
 
 data Token = Hash | Dash | Plus | Equal | SpaceChar | Ast 
-    | UndScore | Lt | Num | Tab | Backslash | Dot
+    | UndScore | Lt | Tab | Backslash | Dot
     | LBra | RBra | Exclamation | BackTick | NewLine
     | LPar | RPar | Quote | Gt | PMD Elements | Err Text
     | ContentText Text | Hash2 | Hash3 | Hash4 | Hash5 | Hash6
-    | NumLiteral Text
+    | NumLiteral Text 
     deriving (Eq, Show)
 
 --what is ListItem?
@@ -17,8 +18,8 @@ data Token = Hash | Dash | Plus | Equal | SpaceChar | Ast
 data Elements = H1 Text | H2 Text | H3 Text 
     | H4 Text | H5 Text | H6 Text | Para Text
     | LnBreak | Bold Text | Italic Text | BoldAndItalic Text 
-    | Blockquote Text | OrderedList [Text] | ListItem 
-    | UnorderedList [Text] | Code Text | Image Text Text
+    | Blockquote Text | OrderedList [Elements] | ListItem Text
+    | UnorderedList [Elements] | Code Text | Image Text Text
     | HorizontalRule | Link Text Text | Block [Token]
     deriving (Eq, Show)
 
@@ -30,11 +31,12 @@ lexer ('.' : xs) = Dot : lexer xs
 lexer ('-' : xs) = Dash : lexer xs 
 lexer ('+' : xs) = Plus : lexer xs 
 lexer ('=' : xs) = Equal : lexer xs 
+lexer ('\n' : xs) = NewLine : lexer xs
+lexer ('\t' : xs) = Tab : lexer xs 
 lexer (x:xs) | isSpace x = SpaceChar : lexer xs 
 lexer ('*' : xs) = Ast : lexer xs 
 lexer ('_' : xs) = UndScore : lexer xs 
 lexer ('<' : xs) = Lt : lexer xs 
-lexer ('\t' : xs) = Tab : lexer xs 
 lexer ('\\' : xs) = Backslash : lexer xs 
 lexer ('{' : xs) = LBra : lexer xs 
 lexer ('}' : xs) = RBra : lexer xs 
@@ -44,7 +46,6 @@ lexer ('(' : xs) = LPar : lexer xs
 lexer (')' : xs) = RPar : lexer xs 
 lexer ('"' : xs) = Quote : lexer xs 
 lexer ('>' : xs) = Gt : lexer xs 
-lexer ('\n' : xs) = NewLine : lexer xs
 lexer (x:xs) | isDigit x = let (y,z) = parseNum (x:xs)
                               in NumLiteral y : lexer z
 lexer (x:xs) | isAlpha x = let (y,z) = span isAlphaNum xs 
@@ -70,9 +71,9 @@ parseHash s =
         6 -> (Hash6, 5)
         x -> (Err "too many/not enough hashmarks", 0)
 
-parser :: [Token] -> Either Elements String 
-parser s = case result of 
-    [PMD element] -> Left element
+parser :: [Token] -> Either [Token] String 
+parser s = case result of
+    (PMD e) : xs -> Left (PMD e : xs)
     [Err e] -> Right e
     _ -> Right $ "Parse error: " ++ show s
     where
@@ -86,7 +87,7 @@ sr (ContentText t : Hash4 : ts) q = sr (PMD (H4 t) : ts) q
 sr (ContentText t : Hash5 : ts) q = sr (PMD (H5 t) : ts) q
 sr (ContentText t : Hash6 : ts) q = sr (PMD (H6 t) : ts) q
 sr (ContentText t : NewLine : NewLine : ts) q = sr (PMD (Para t) : ts) q 
-sr (NewLine : SpaceChar : SpaceChar : ts) q = sr (PMD (LnBreak) : ts) q 
+sr (SpaceChar : SpaceChar : ts) q = sr (PMD (LnBreak) : ts) q 
 sr (Ast : Ast : ContentText t : Ast : Ast : ts) q = sr (PMD (Bold t) : ts) q 
 sr (UndScore : UndScore : ContentText t : UndScore : UndScore : ts) q = sr (PMD (Bold t) : ts) q 
 sr (Ast : ContentText t : Ast : ts) q = sr (PMD (Italic t) : ts) q 
@@ -96,10 +97,14 @@ sr (UndScore : UndScore : UndScore : ContentText t : UndScore : UndScore : UndSc
 sr (UndScore : UndScore : Ast : ContentText t : Ast : UndScore : UndScore : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
 sr (Ast : Ast : UndScore : ContentText t : UndScore : Ast : Ast : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
 sr (ContentText t : Gt : ts) q = sr (PMD (Blockquote t) : ts) q
-sr (ContentText t : Dot : Num : ts) q = sr (PMD (OrderedList [t]) : ts) q 
-sr (ContentText t : Dash : ts) q = sr (PMD (UnorderedList [t]) : ts) q
-sr (ContentText t : Ast : ts) q = sr (PMD (UnorderedList [t]) : ts) q
-sr (ContentText t : Plus : ts) q = sr (PMD (UnorderedList [t]) : ts) q
+sr (PMD (OrderedList s2) : NewLine : PMD(OrderedList xs) : ts) q = sr (PMD (OrderedList (xs ++ s2)): ts) q
+sr (PMD (OrderedList s2) : Tab : NumLiteral x : NewLine : PMD (OrderedList s1) : ts) q = sr (PMD (OrderedList (s1 ++ [OrderedList s2])) : ts) q
+sr (PMD (OrderedList s2) : Tab : NewLine : PMD (OrderedList s1) : ts) q = sr (PMD (OrderedList (indentListHelper s1 s2)) : ts) q
+sr (ContentText t : NewLine : PMD(OrderedList xs) : ts) q = sr (PMD (OrderedList (xs ++ [ListItem t])): ts) q
+sr (ContentText t : NumLiteral x : ts) q = sr (PMD (OrderedList [ListItem t]) : ts) q 
+sr (ContentText t : Dash : ts) q = sr (PMD (UnorderedList [ListItem t]) : ts) q
+sr (ContentText t : Ast : ts) q = sr (PMD (UnorderedList [ListItem t]) : ts) q
+sr (ContentText t : Plus : ts) q = sr (PMD (UnorderedList [ListItem t]) : ts) q
 sr (ContentText t : SpaceChar : SpaceChar : SpaceChar : SpaceChar : ts) q = sr (PMD (Code t) : ts) q
 sr (ContentText t : Tab : ts) q = sr (PMD (Code t) : ts) q
 sr (RPar : ContentText t : LPar : RBra : ContentText tx : LBra : Exclamation : ts) q = sr (PMD (Image tx t) : ts) q
@@ -115,3 +120,14 @@ converter :: String -> [Token] -> String
 converter "" = []
 converter s (PMD (H1 t) : xs) = s ++ "<h1>" ++ t ++ "<\h1>" : converter s xs
 converter s (PMD (H1 t) : xs) = s ++ "<h2>" ++ t ++ "<\h2>" : converter s xs
+
+indentListHelper :: [Elements] -> [Elements] -> [Elements]
+indentListHelper [] ys = [OrderedList ys]
+indentListHelper (x:xs) ys = 
+    case x of
+        OrderedList zs -> xs ++ [addListToOrderedList (OrderedList zs) ys]
+        _ -> x : indentListHelper xs ys
+
+addListToOrderedList :: Elements -> [Elements] -> Elements
+addListToOrderedList (OrderedList existingList) newList = OrderedList (existingList ++ newList)
+addListToOrderedList otherElement _ = otherElement

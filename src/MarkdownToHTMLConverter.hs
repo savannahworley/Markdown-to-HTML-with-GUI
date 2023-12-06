@@ -13,8 +13,6 @@ data Token = Hash | Dash | Plus | Equal | SpaceChar | Ast
     | NumLiteral Text 
     deriving (Eq, Show)
 
---what is ListItem?
-
 data Elements = H1 Text | H2 Text | H3 Text 
     | H4 Text | H5 Text | H6 Text | Para Text
     | LnBreak | Bold Text | Italic Text | BoldAndItalic Text 
@@ -107,6 +105,7 @@ sr (ContentText t : Ast : ts) q = sr (PMD (UnorderedList [ListItem t]) : ts) q
 sr (ContentText t : Plus : ts) q = sr (PMD (UnorderedList [ListItem t]) : ts) q
 sr (ContentText t : SpaceChar : SpaceChar : SpaceChar : SpaceChar : ts) q = sr (PMD (Code t) : ts) q
 sr (ContentText t : Tab : ts) q = sr (PMD (Code t) : ts) q
+sr (BackTick : ContentText t : BackTick : ts) q = sr (PMD (Code t) : ts) q
 sr (RPar : ContentText t : LPar : RBra : ContentText tx : LBra : Exclamation : ts) q = sr (PMD (Image tx t) : ts) q
 sr (Ast : Ast : Ast : ts) q = sr (PMD (HorizontalRule) : ts) q 
 sr (UndScore : UndScore : UndScore : ts) q = sr (PMD (HorizontalRule) : ts) q 
@@ -116,10 +115,22 @@ sr (Err e : ts) q = [Err e]
 sr ts (x:q) = sr (x:ts) q
 sr ts [] = ts
 
+--needs Links, Images, HorizontalRule, OrderedList and UnOrderedList
 converter :: String -> [Token] -> String 
 converter "" = []
 converter s (PMD (H1 t) : xs) = s ++ "<h1>" ++ t ++ "</h1>" : converter s xs
-converter s (PMD (H1 t) : xs) = s ++ "<h2>" ++ t ++ "</h2>" : converter s xs
+converter s (PMD (H2 t) : xs) = s ++ "<h2>" ++ t ++ "</h2>" : converter s xs
+converter s (PMD (H3 t) : xs) = s ++ "<h3>" ++ t ++ "</h3>" : converter s xs
+converter s (PMD (H4 t) : xs) = s ++ "<h4>" ++ t ++ "</h4>" : converter s xs
+converter s (PMD (H5 t) : xs) = s ++ "<h5>" ++ t ++ "</h5>" : converter s xs
+converter s (PMD (H6 t) : xs) = s ++ "<h6>" ++ t ++ "</h6>" : converter s xs
+converter s (PMD (Para t) : xs) = s ++ "<p>" ++ t ++ "</p>" : converter s xs 
+converter s (PMD (LnBreak) : xs) = s ++ "<br>" : converter s xs 
+converter s (PMD (Bold t) : xs) = s ++ "<strong>" ++ t ++ "</strong>" : converter s xs 
+converter s (PMD (Italic t) : xs) = s ++ "<em>" ++ t ++ "</em>" : converter s xs 
+converter s (PMD (BoldAndItalic t) : xs) = s ++ "<em><strong>" ++ t ++ "</strong></em>" : converter s xs 
+converter s (PMD (Blockquote t) : xs) = s ++ ">" ++ t : converter s xs 
+converter s (PMD (Code t) : xs) = s ++ "<code>" ++ t ++ "</code>" : converter s xs 
 
 indentListHelper :: [Elements] -> [Elements] -> [Elements]
 indentListHelper [] ys = [OrderedList ys]

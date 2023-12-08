@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 module MarkdownToHTMLConverter where
 
 import Data.Char
@@ -105,6 +106,7 @@ sr (Ast : Ast : UndScore : ContentText t : UndScore : Ast : Ast : ts) q = sr (PM
 sr (ContentText t : Gt : ts) q = sr (PMD (Blockquote t) : ts) q
 
 --ordered list code
+sr (ContentText t : NumLiteral _ : Tab x : NewLine : PMD (UnorderedList x1 xs) : ts) q = sr (PMD (UnorderedList x1 (xs ++ [OrderedList x [ListItem t]])) : ts) q
 sr (ContentText t : NumLiteral _ : Tab x1 : NewLine : PMD (OrderedList x xs) : ts) q | x == x1 = sr (PMD (OrderedList x (xs ++ [ListItem t])) : ts) q
     | otherwise = sr (PMD (OrderedList x (indentListHelper (OrderedList x1 [ListItem t]) xs)) : ts) q
 sr (PMD (OrderedList i s2) : NewLine : PMD(OrderedList i1 xs) : ts) q | i == i1 = sr (PMD (OrderedList i1 (xs ++ s2)): ts) q
@@ -123,6 +125,9 @@ sr (PMD (OrderedList i s2) : Tab x1 : NewLine : NumLiteral _ : NewLine : PMD (Or
 
 
 --unordered list code
+sr (ContentText t : Dash : Tab x : NewLine : PMD (OrderedList x1 xs) : ts) q = sr (PMD (OrderedList x1 (xs ++ [UnorderedList x [ListItem t]])) : ts) q
+sr (ContentText t : Ast : Tab x : NewLine : PMD (OrderedList x1 xs) : ts) q = sr (PMD (OrderedList x1 (xs ++ [UnorderedList x [ListItem t]])) : ts) q
+sr (ContentText t : Plus : Tab x : NewLine : PMD (OrderedList x1 xs) : ts) q = sr (PMD (OrderedList x1 (xs ++ [UnorderedList x [ListItem t]])) : ts) q
 sr (ContentText t : Dash : Tab x1 : NewLine : PMD (UnorderedList x xs) : ts) q | x == x1 = sr (PMD (UnorderedList x (xs ++ [ListItem t])) : ts) q
     | otherwise = sr (PMD (UnorderedList x (indentListHelper2 (UnorderedList x1 [ListItem t]) xs)) : ts) q
 sr (ContentText t : Ast : Tab x1 : NewLine : PMD (UnorderedList x xs) : ts) q | x == x1 = sr (PMD (UnorderedList x (xs ++ [ListItem t])) : ts) q
@@ -139,9 +144,7 @@ sr (PMD (UnorderedList i s2) : Tab x1 : NewLine : Dash : NewLine : PMD (Unordere
 sr (PMD (UnorderedList i s2) : Tab x1 : NewLine : Ast : NewLine : PMD (UnorderedList i1 s1) : ts) q = sr (PMD (UnorderedList i1 (s1 ++ [UnorderedList x1 s2])) : ts) q
 sr (PMD (UnorderedList i s2) : Tab x1 : NewLine : Plus : NewLine : PMD (UnorderedList i1 s1) : ts) q = sr (PMD (UnorderedList i1 (s1 ++ [UnorderedList x1 s2])) : ts) q
 
--- sr (ContentText t : Dash : ts) q = sr (PMD (UnorderedList [ListItem t]) : ts) q
--- sr (ContentText t : Ast : ts) q = sr (PMD (UnorderedList [ListItem t]) : ts) q
--- sr (ContentText t : Plus : ts) q = sr (PMD (UnorderedList [ListItem t]) : ts) q
+
 
 sr (ContentText t : SpaceChar : SpaceChar : SpaceChar : SpaceChar : ts) q = sr (PMD (Code t) : ts) q
 sr (ContentText t : Tab x : ts) q = sr (PMD (Code t) : ts) q
@@ -158,17 +161,23 @@ sr ts [] = ts
 --needs Links, Images, HorizontalRule, OrderedList and UnOrderedList
 
 indentListHelper :: Elements -> [Elements] -> [Elements]
-indentListHelper x [] = [x]
-indentListHelper (OrderedList x xs) (y:ys) = 
-    case y of 
-        OrderedList x1 zs -> if x == x1 then [OrderedList x (zs ++ xs)] else y : indentListHelper (OrderedList x xs) ys
-        _ -> y : indentListHelper (OrderedList x xs) ys
+indentListHelper (OrderedList x xs) ((OrderedList y ys) : zs) = if x == y then [OrderedList y (ys ++ xs)] ++ zs else (OrderedList y ys) : zs ++ [OrderedList x xs]
+indentListHelper (OrderedList x xs) ys = ys ++ [OrderedList x xs]
+-- indentListHelper x [] = [x]
+-- indentListHelper (OrderedList x xs) (y:ys) = 
+--     case y of 
+--         OrderedList x1 zs -> if x == x1 then [OrderedList x1 (zs ++ xs)] ++ ys else y : indentListHelper (OrderedList x xs) ys
+--         _ -> y : indentListHelper (OrderedList x xs) ys
 
 indentListHelper2 :: Elements -> [Elements] -> [Elements]
-indentListHelper2 (UnorderedList x xs) (y:ys) = 
-    case y of 
-        UnorderedList x1 zs -> if x == x1 then [UnorderedList x (zs ++ xs)] else y : indentListHelper2 (UnorderedList x xs) ys
-        _ -> y : indentListHelper2 (UnorderedList x xs) ys
+indentListHelper2 (UnorderedList x xs) ((UnorderedList y ys) : zs) = if x == y then [UnorderedList y (ys ++ xs)] ++ zs else (UnorderedList y ys) : zs ++ [UnorderedList x xs]
+indentListHelper2 (UnorderedList x xs) ys = ys ++ [UnorderedList x xs]
+-- indentListHelper2 x [] = [x]
+-- indentListHelper2 (UnorderedList x xs) (y:ys) = 
+--     case y of 
+--         UnorderedList x1 zs -> if x == x1 then [UnorderedList x (zs ++ xs)] else y : indentListHelper2 (UnorderedList x xs) ys
+--         _ -> y : indentListHelper2 (UnorderedList x xs) ys
+
 
 converter :: String -> [Token] -> String 
 converter "" [] = []

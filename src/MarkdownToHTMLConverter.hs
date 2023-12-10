@@ -51,7 +51,7 @@ lexer ('"' : xs) = Quote : lexer xs
 lexer ('>' : xs) = Gt : lexer xs 
 lexer (x:xs) | isDigit x = let (y,z) = parseNum (x:xs)
                               in NumLiteral y : lexer z
-lexer (x:xs) | isAlpha x = let (y,z) = span isAlphaNum xs 
+lexer (x:xs) | isAlpha x = let (y,z) = span textParse xs 
                             in ContentText (x:y) : lexer z
 lexer xs = [Err xs]
 
@@ -61,6 +61,10 @@ parseNum xs =
    in case x' of
       ('.':ys) -> (x ++ "." ++ y , z)       where (y,z) = span isDigit ys
       _        -> (x,x')
+
+--predicate for ContentText span to help keep lexer simple
+textParse :: Char -> Bool
+textParse c = (isAlphaNum c) || (c == ' ') || (c == '.')
 
 parseHash :: String -> (Token, Int)
 parseHash s = 
@@ -139,7 +143,9 @@ sr (ContentText t : Hash4 : ts) q = sr (PMD (H4 t) : ts) q
 sr (ContentText t : Hash5 : ts) q = sr (PMD (H5 t) : ts) q
 sr (ContentText t : Hash6 : ts) q = sr (PMD (H6 t) : ts) q
 --creating a paragraph
-sr (ContentText t : NewLine : ts) q = sr (PMD (Para t) : ts) q
+sr (NewLine : ContentText t1 : NewLine : ContentText t : ts) q = sr (PMD (Para t1) : PMD (Para t) : ts) q
+sr (ContentText t1 : NewLine : ContentText t : ts) q = sr (PMD (Para t1) : PMD (Para t) : ts) q
+--sr (ContentText t : NewLine : ts) q = sr (PMD (Para t) : ts) q
 --creating a line break 
 sr (SpaceChar : SpaceChar : ts) q = sr (PMD (LnBreak) : ts) q 
 --creating bold text
@@ -166,7 +172,10 @@ sr (Ast : Ast : Ast : ts) q = sr (PMD (HorizontalRule) : ts) q
 sr (UndScore : UndScore : UndScore : ts) q = sr (PMD (HorizontalRule) : ts) q 
 sr (Dash : Dash : Dash : ts) q = sr (PMD (HorizontalRule) : ts) q 
 sr (RPar : ContentText t : LPar : RBra : ContentText tx : LBra : ts) q = sr (PMD (Image tx t) : ts) q
+--lexer error case
 sr (Err e : ts) q = [Err e]
+--case for lone contenttext, going to make the assumption user wants a paragraph, otherwise it would be unhandled
+sr (ContentText t : ts) q = sr (PMD (Para t) : ts) q
 sr ts (x:q) = sr (x:ts) q
 sr ts [] = ts
 
@@ -197,13 +206,4 @@ converter s (PMD (BoldAndItalic t) : xs) = s ++ "<em><strong>" ++ t ++ "</strong
 converter s (PMD (Blockquote t) : xs) = s ++ ">" ++ t ++ converter s xs 
 converter s (PMD (Code t) : xs) = s ++ "<code>" ++ t ++ "</code>" ++ converter s xs 
 
--- indentListHelper :: [Elements] -> [Elements] -> [Elements]
--- indentListHelper [] ys = [OrderedList  ys]
--- indentListHelper (x:xs) ys = 
---     case x of
---         OrderedList x1 zs -> xs ++ [addListToOrderedList (OrderedList x1 zs) ys]
---         _ -> x : indentListHelper xs ys
 
--- addListToOrderedList :: Elements -> [Elements] -> Elements
--- addListToOrderedList (OrderedList x existingList) newList = OrderedList (existingList ++ newList)
--- addListToOrderedList otherElement _ = otherElement

@@ -205,5 +205,21 @@ converter s (PMD (Italic t) : xs) = s ++ "<em>" ++ t ++ "</em>" ++ converter s x
 converter s (PMD (BoldAndItalic t) : xs) = s ++ "<em><strong>" ++ t ++ "</strong></em>" ++ converter s xs 
 converter s (PMD (Blockquote t) : xs) = s ++ ">" ++ t ++ converter s xs 
 converter s (PMD (Code t) : xs) = s ++ "<code>" ++ t ++ "</code>" ++ converter s xs 
+converter s (PMD (UnorderedList _ elements) : xs) = converter (s ++ convertUnorderedList elements) xs
+converter s (PMD (OrderedList _ elements) : xs) = converter (s ++ convertOrderedList elements) xs
+
+--creates the outside braces that indicate this is an unordered list
+convertUnorderedList :: [Elements] -> String
+convertUnorderedList elements = "<ul>\n" ++ concatMap convertListElement elements ++ "</ul>"
+
+--creates the outside braces that indicate this is an ordered list
+convertOrderedList :: [Elements] -> String
+convertOrderedList elements = "<ol>\n" ++ concatMap convertListElement elements ++ "</ol>"
+
+--traverses through the list and marks each element as a part of the list within the undordered/ordered list braces
+convertListElement :: Elements -> String
+convertListElement (ListItem t) = "<li>" ++ t ++ "</li>\n"
+convertListElement (OrderedList _ nestedElements) = convertOrderedList nestedElements
+convertListElement (UnorderedList _ nestedElements) = convertUnorderedList nestedElements
 
 

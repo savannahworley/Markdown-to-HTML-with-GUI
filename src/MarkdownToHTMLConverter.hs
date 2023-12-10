@@ -207,9 +207,9 @@ converter s (PMD (Blockquote t) : xs) = s ++ ">" ++ t ++ converter s xs
 converter s (PMD (Code t) : xs) = s ++ "<code>" ++ t ++ "</code>" ++ converter s xs 
 converter s (PMD (UnorderedList _ elements) : xs) = converter (s ++ convertUnorderedList elements) xs
 converter s (PMD (OrderedList _ elements) : xs) = converter (s ++ convertOrderedList elements) xs
-converter s (PMD (Link tx t) : xs) = s ++ "<a href=" ++ tx ++ ">" ++ t ++ "</a>" ++ converter s xs
-converter s (PMD (Image tx t) : xs) = s ++ "<img " ++ tx ++ ">" ++ t ++ "</img>" ++ converter s xs
-converter s (PMD (HorizontalRule) : xs) = s ++ "<hr>" ++ converter s xs
+converter s (PMD (Link tx t) : xs) = s ++ "<a href=\"" ++ t ++ "\">" ++ tx ++ "</a>" ++ converter s xs
+converter s (PMD (Image tx t) : xs) = s ++ "<img src=\"" ++ t ++ "\" alt=\"" ++ tx ++ "\">" ++ "</img>" ++ converter s xs
+converter s (PMD (HorizontalRule) : xs) = s ++ "<hr>\n" ++ converter s xs
 
 --creates the outside braces that indicate this is an unordered list
 convertUnorderedList :: [Elements] -> String

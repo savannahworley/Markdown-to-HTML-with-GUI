@@ -41,11 +41,13 @@ lexer ('*' : xs) = Ast : lexer xs
 lexer ('_' : xs) = UndScore : lexer xs 
 lexer ('<' : xs) = Lt : lexer xs 
 lexer ('\\' : xs) = Backslash : lexer xs 
-lexer ('{' : xs) = LBra : lexer xs 
-lexer ('}' : xs) = RBra : lexer xs 
+lexer ('[' : xs) = LBra : ContentText x : lexer (drop y xs) 
+    where (x,y) = parseAlt xs
+lexer (']' : xs) = RBra : lexer xs 
 lexer ('!' : xs) = Exclamation : lexer xs 
 lexer ('`' : xs) = BackTick : lexer xs 
-lexer ('(' : xs) = LPar : lexer xs 
+lexer ('(' : xs) = LPar : ContentText x : lexer (drop y xs)
+    where (x,y) = parseLink xs
 lexer (')' : xs) = RPar : lexer xs 
 lexer ('"' : xs) = Quote : lexer xs 
 lexer ('>' : xs) = Gt : lexer xs 
@@ -54,6 +56,14 @@ lexer (x:xs) | isDigit x = let (y,z) = parseNum (x:xs)
 lexer (x:xs) | isAlpha x = let (y,z) = span textParse xs 
                             in ContentText (x:y) : lexer z
 lexer xs = [Err xs]
+
+parseLink :: String -> (String, Int)
+parseLink s = (x, length x) where
+    (x,y) = span linkParse s
+
+parseAlt :: String -> (String, Int)
+parseAlt s = (x, length x) where
+    (x,y) = span altParse s
 
 parseNum :: String -> (String,String)
 parseNum xs =
@@ -65,6 +75,12 @@ parseNum xs =
 --predicate for ContentText span to help keep lexer simple
 textParse :: Char -> Bool
 textParse c = (isAlphaNum c) || (c == ' ') || (c == '.')
+
+altParse :: Char -> Bool
+altParse c = (isPrint c && (c /= ']'))
+
+linkParse :: Char -> Bool
+linkParse c = (isPrint c && (c /= ')'))
 
 parseHash :: String -> (Token, Int)
 parseHash s = 
@@ -85,6 +101,7 @@ parseTab xs = (Tab (length x), length x)
 parser :: [Token] -> Either [Token] String 
 parser s = case result of
     (PMD e) : xs -> Left (PMD e : xs)
+    (NewLine : xs) -> Left (NewLine : xs)
     [Err e] -> Right e
     _ -> Right $ "Parse error: " ++ show s
     where
@@ -142,10 +159,16 @@ sr (ContentText t : Hash3 : ts) q = sr (PMD (H3 t) : ts) q
 sr (ContentText t : Hash4 : ts) q = sr (PMD (H4 t) : ts) q
 sr (ContentText t : Hash5 : ts) q = sr (PMD (H5 t) : ts) q
 sr (ContentText t : Hash6 : ts) q = sr (PMD (H6 t) : ts) q
+
+--creating links and images
+sr (RPar : ContentText t : RPar : LBra : ContentText t1 : RBra : Exclamation : ts) q = sr (PMD (Image t1 t) : ts) q
+sr (RPar : ContentText t : RPar : LBra : ContentText t1 : RBra : ts) q = sr (PMD (Link t1 t) : ts) q
+
+
 --creating a paragraph
 sr (NewLine : ContentText t1 : NewLine : ContentText t : ts) q = sr (PMD (Para t1) : PMD (Para t) : ts) q
 sr (ContentText t1 : NewLine : ContentText t : ts) q = sr (PMD (Para t1) : PMD (Para t) : ts) q
---sr (ContentText t : NewLine : ts) q = sr (PMD (Para t) : ts) q
+sr (ContentText t : NewLine : ts) q = sr (PMD (Para t) : ts) q
 --creating a line break 
 sr (SpaceChar : SpaceChar : ts) q = sr (PMD (LnBreak) : ts) q 
 --creating bold text
@@ -175,7 +198,7 @@ sr (RPar : ContentText t : LPar : RBra : ContentText tx : LBra : ts) q = sr (PMD
 --lexer error case
 sr (Err e : ts) q = [Err e]
 --case for lone contenttext, going to make the assumption user wants a paragraph, otherwise it would be unhandled
-sr (ContentText t : ts) q = sr (PMD (Para t) : ts) q
+sr (ContentText t : []) q = sr (PMD (Para t) : []) q
 sr ts (x:q) = sr (x:ts) q
 sr ts [] = ts
 
@@ -192,7 +215,7 @@ indentListHelper2 (UnorderedList x xs) ys = ys ++ [UnorderedList x xs]
 --parsed markdown needs to be reversed before being converted, comes out reversed from parser
 --bold and italic tags should be 
 converter :: String -> [Token] -> String 
-converter "" [] = []
+converter s [] = s
 converter s (PMD (H1 t) : xs) = s ++ "<h1>" ++ t ++ "</h1>\n" ++ converter s xs
 converter s (PMD (H2 t) : xs) = s ++ "<h2>" ++ t ++ "</h2>\n" ++ converter s xs
 converter s (PMD (H3 t) : xs) = s ++ "<h3>" ++ t ++ "</h3>\n" ++ converter s xs
@@ -214,8 +237,8 @@ converter s (PMD (OrderedList _ elements) : xs) = converter (s ++ convertOrdered
 converter s (PMD (Link tx t) : xs) = s ++ "<a href=\"" ++ t ++ "\">" ++ tx ++ "</a>" ++ converter s xs
 converter s (PMD (Image tx t) : xs) = s ++ "<img src=\"" ++ t ++ "\" alt=\"" ++ tx ++ "\">" ++ "</img>" ++ converter s xs
 converter s (PMD (HorizontalRule) : xs) = s ++ "<hr>\n" ++ converter s xs
--- converter s (NewLine : xs) = converter s xs
--- converter s (SpaceChar : xs) = converter s xs
+converter s (NewLine : xs) = converter s xs
+converter s (SpaceChar : xs) = converter s xs
 
 --creates the outside braces that indicate this is an unordered list
 convertUnorderedList :: [Elements] -> String
@@ -236,5 +259,5 @@ runConverter :: String -> String
 runConverter s = 
     let par = parser (lexer s) in 
         case par of 
-            Left x -> converter "" x
+            Left x -> converter "" (reverse x) 
             Right err -> err

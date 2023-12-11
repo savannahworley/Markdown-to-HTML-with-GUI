@@ -4,25 +4,25 @@ module MarkdownToHTMLConverter where
 import Data.Char
 
 
-type Text = String 
+type Content = String 
 
 data Token = Hash | Dash | Plus | Equal | SpaceChar | Ast 
     | UndScore | Lt | Tab Int | Backslash | Dot
     | LBra | RBra | Exclamation | BackTick | NewLine
-    | LPar | RPar | Quote | Gt | PMD Elements | Err Text
-    | ContentText Text | Hash2 | Hash3 | Hash4 | Hash5 | Hash6
-    | NumLiteral Text 
+    | LPar | RPar | Quote | Gt | PMD Elements | Err Content
+    | ContentText Content | Hash2 | Hash3 | Hash4 | Hash5 | Hash6
+    | NumLiteral Content 
     deriving (Eq, Show)
 
 --added an indention field to the lists and tab, since we can't make
 --a case for all the different amounts of tabs
 
-data Elements = H1 Text | H2 Text | H3 Text 
-    | H4 Text | H5 Text | H6 Text | Para Text
-    | LnBreak | Bold Text | Italic Text | BoldAndItalic Text 
-    | Blockquote Text | OrderedList Int [Elements] | ListItem Text
-    | UnorderedList Int [Elements] | Code Text | Image Text Text
-    | HorizontalRule | Link Text Text | Block [Token]
+data Elements = H1 Content | H2 Content | H3 Content 
+    | H4 Content | H5 Content | H6 Content | Para Content
+    | LnBreak | Bold Content | Italic Content | BoldAndItalic Content 
+    | Blockquote Content | OrderedList Int [Elements] | ListItem Content
+    | UnorderedList Int [Elements] | Code Content | Image Content Content
+    | HorizontalRule | Link Content Content | Block [Token]
     deriving (Eq, Show)
 
 lexer :: String -> [Token]
@@ -189,7 +189,8 @@ indentListHelper2 :: Elements -> [Elements] -> [Elements]
 indentListHelper2 (UnorderedList x xs) ((UnorderedList y ys) : zs) = if x == y then [UnorderedList y (ys ++ xs)] ++ zs else (UnorderedList y ys) : zs ++ [UnorderedList x xs]
 indentListHelper2 (UnorderedList x xs) ys = ys ++ [UnorderedList x xs]
 
-
+--parsed markdown needs to be reversed before being converted, comes out reversed from parser
+--bold and italic tags should be 
 converter :: String -> [Token] -> String 
 converter "" [] = []
 converter s (PMD (H1 t) : xs) = s ++ "<h1>" ++ t ++ "</h1>\n" ++ converter s xs
@@ -198,18 +199,23 @@ converter s (PMD (H3 t) : xs) = s ++ "<h3>" ++ t ++ "</h3>\n" ++ converter s xs
 converter s (PMD (H4 t) : xs) = s ++ "<h4>" ++ t ++ "</h4>\n" ++ converter s xs
 converter s (PMD (H5 t) : xs) = s ++ "<h5>" ++ t ++ "</h5>\n" ++ converter s xs
 converter s (PMD (H6 t) : xs) = s ++ "<h6>" ++ t ++ "</h6>\n" ++ converter s xs
+converter s (PMD (Para t) : PMD (Italic t1) : PMD (Para t2) : xs) = s ++ "<p>" ++ t ++ "<i>" ++ t1 ++ " " ++ "</i>" ++ t2 ++ "</p>"
+converter s (PMD (Para t) : PMD (Bold t1) : PMD (Para t2) : xs) = s ++ "<p>" ++ t ++ "<b>" ++ t1 ++ " " ++ "</b>" ++ t2 ++ "</p>"
+converter s (PMD (Para t) : PMD (BoldAndItalic t1) : PMD (Para t2) : xs) = s ++ "<p>" ++ t ++ "<i><b>" ++ t1 ++ " " ++ "</b></i>" ++ t2 ++ "</p>"
 converter s (PMD (Para t) : xs) = s ++ "<p>" ++ t ++ "</p>\n" ++ converter s xs 
 converter s (PMD (LnBreak) : xs) = s ++ "<br>\n" ++ converter s xs 
-converter s (PMD (Bold t) : xs) = s ++ "<strong>" ++ t ++ "</strong>" ++ converter s xs 
-converter s (PMD (Italic t) : xs) = s ++ "<em>" ++ t ++ "</em>" ++ converter s xs 
-converter s (PMD (BoldAndItalic t) : xs) = s ++ "<em><strong>" ++ t ++ "</strong></em>" ++ converter s xs 
-converter s (PMD (Blockquote t) : xs) = s ++ ">" ++ t ++ converter s xs 
+converter s (PMD (Bold t) : xs) = s ++ "<b>" ++ t ++ "</b>" ++ converter s xs 
+converter s (PMD (Italic t) : xs) = s ++ "<i>" ++ t ++ "</i>" ++ converter s xs 
+converter s (PMD (BoldAndItalic t) : xs) = s ++ "<i><b>" ++ t ++ "</b></i>" ++ converter s xs 
+converter s (PMD (Blockquote t) : xs) = s ++ "<blockquote>" ++ t ++ "</blockquote>" ++converter s xs 
 converter s (PMD (Code t) : xs) = s ++ "<code>" ++ t ++ "</code>" ++ converter s xs 
 converter s (PMD (UnorderedList _ elements) : xs) = converter (s ++ convertUnorderedList elements) xs
 converter s (PMD (OrderedList _ elements) : xs) = converter (s ++ convertOrderedList elements) xs
 converter s (PMD (Link tx t) : xs) = s ++ "<a href=\"" ++ t ++ "\">" ++ tx ++ "</a>" ++ converter s xs
 converter s (PMD (Image tx t) : xs) = s ++ "<img src=\"" ++ t ++ "\" alt=\"" ++ tx ++ "\">" ++ "</img>" ++ converter s xs
 converter s (PMD (HorizontalRule) : xs) = s ++ "<hr>\n" ++ converter s xs
+-- converter s (NewLine : xs) = converter s xs
+-- converter s (SpaceChar : xs) = converter s xs
 
 --creates the outside braces that indicate this is an unordered list
 convertUnorderedList :: [Elements] -> String
@@ -226,3 +232,9 @@ convertListElement (OrderedList _ nestedElements) = convertOrderedList nestedEle
 convertListElement (UnorderedList _ nestedElements) = convertUnorderedList nestedElements
 
 
+runConverter :: String -> String
+runConverter s = 
+    let par = parser (lexer s) in 
+        case par of 
+            Left x -> converter "" x
+            Right err -> err

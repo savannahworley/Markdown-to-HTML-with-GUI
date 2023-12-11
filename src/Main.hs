@@ -9,14 +9,15 @@
 module Main where
 
 import Control.Lens
-import Data.Text (Text)
+import Data.Text
 import Monomer
 import TextShow
+import MarkdownToHTMLConverter
 
 import qualified Monomer.Lens as L
 
 data AppModel = AppModel {
-  _textInput :: Text,
+  _textInputMKD :: Text,
   _textOutput :: Text
 } deriving (Eq, Show)
 
@@ -32,10 +33,11 @@ buildUI
   -> AppModel
   -> WidgetNode AppModel AppEvent
 buildUI wenv model = widgetTree where
-  enterText = keystroke [("Enter", TextProcess)] $ vstack [
-    hstack [label "Enter Your Markdown Here:"],
+  enterText = keystroke [("Enter", TextProcess)] $ 
+    vstack [
+    hstack [label "Enter Your Markdown Here:", mainButton "Convert" TextProcess],
       spacer,
-      textArea input,
+      textArea inputMKD,
       hstack [label "Here is Your Parsed Markdown: "],
       textArea output
     ]
@@ -54,8 +56,12 @@ handleEvent
 handleEvent wenv node model evt = case evt of
   AppInit -> []
   TextProcess -> [
-    Model (model & output .~ "Parsed Markdown")
+    Model (model & output .~ pack (runConverter(textToString (model ^. inputMKD))))
     ]
+
+textToString :: Text -> String
+textToString t = unpack t
+
 
 main :: IO ()
 main = do

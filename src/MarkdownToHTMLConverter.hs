@@ -115,6 +115,7 @@ sr (Ast : Ast : ContentText t : SpaceChar : Ast : Ast : ts) q = sr (PMD (Bold t)
 sr (UndScore : UndScore : ContentText t : UndScore : UndScore : ts) q = sr (PMD (Bold t) : ts) q 
 --creating italic text
 sr (Ast : ContentText t : Ast : ts) q = sr (PMD (Italic t) : ts) q 
+sr (Ast : ContentText t : SpaceChar : Ast : ts) q = sr (PMD (Italic t) : ts) q
 sr (UndScore : SpaceChar : ContentText t : SpaceChar : UndScore : ts) q = sr (PMD (Italic t) : ts) q 
 --creating bold and italic combo
 sr (Ast : Ast : Ast : ContentText t : Ast : Ast : Ast : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
@@ -246,6 +247,7 @@ converter s (PMD (HorizontalRule) : xs) = s ++ "<hr>\n" ++ converter s xs
 converter s (NewLine : xs) = converter s xs
 converter s (SpaceChar : xs) = converter s xs
 converter s (Ast : xs) = converter s xs
+converter s (Dot : xs) = converter s xs
 --converter s (UndScore : xs) = converter s xs
 
 --creates the outside braces that indicate this is an unordered list

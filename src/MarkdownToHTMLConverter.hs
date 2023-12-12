@@ -109,6 +109,19 @@ parser s = case result of
 
 sr :: [Token] -> [Token] -> [Token]
 
+--creating bold text
+sr (Ast : Ast : PMD (Para t) : Ast : Ast : ts) q = sr (PMD (Bold t) : ts) q
+sr (Ast : Ast : ContentText t : Ast : Ast : ts) q = sr (PMD (Bold t) : ts) q 
+sr (UndScore : UndScore : ContentText t : UndScore : UndScore : ts) q = sr (PMD (Bold t) : ts) q 
+--creating italic text
+sr (Ast : ContentText t : Ast : ts) q = sr (PMD (Italic t) : ts) q 
+sr (UndScore : ContentText t : UndScore : ts) q = sr (PMD (Italic t) : ts) q 
+--creating bold and italic combo
+sr (Ast : Ast : Ast : ContentText t : Ast : Ast : Ast : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
+sr (UndScore : UndScore : UndScore : ContentText t : UndScore : UndScore : UndScore : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
+sr (UndScore : UndScore : Ast : ContentText t : Ast : UndScore : UndScore : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
+sr (Ast : Ast : UndScore : ContentText t : UndScore : Ast : Ast : ts) q = sr (PMD (BoldAndItalic t) : ts) q
+
 --ordered list code
 --nesting ordered list in unordered list
 sr (ContentText t : NumLiteral _ : Tab x : NewLine : PMD (UnorderedList x1 xs) : ts) q = sr (PMD (UnorderedList x1 (xs ++ [OrderedList x [ListItem t]])) : ts) q
@@ -171,23 +184,13 @@ sr (ContentText t1 : NewLine : ContentText t : ts) q = sr (PMD (Para t1) : PMD (
 sr (ContentText t : NewLine : ts) q = sr (PMD (Para t) : ts) q
 --creating a line break 
 sr (SpaceChar : SpaceChar : ts) q = sr (PMD (LnBreak) : ts) q 
---creating bold text
-sr (Ast : Ast : ContentText t : Ast : Ast : ts) q = sr (PMD (Bold t) : ts) q 
-sr (UndScore : UndScore : ContentText t : UndScore : UndScore : ts) q = sr (PMD (Bold t) : ts) q 
---creating italic text
-sr (Ast : ContentText t : Ast : ts) q = sr (PMD (Italic t) : ts) q 
-sr (UndScore : ContentText t : UndScore : ts) q = sr (PMD (Italic t) : ts) q 
---creating bold and italic combo
-sr (Ast : Ast : Ast : ContentText t : Ast : Ast : Ast : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
-sr (UndScore : UndScore : UndScore : ContentText t : UndScore : UndScore : UndScore : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
-sr (UndScore : UndScore : Ast : ContentText t : Ast : UndScore : UndScore : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
-sr (Ast : Ast : UndScore : ContentText t : UndScore : Ast : Ast : ts) q = sr (PMD (BoldAndItalic t) : ts) q
 --creating a blockquote 
 sr (ContentText t : Gt : ts) q = sr (PMD (Blockquote t) : ts) q
 --creating a code block
 sr (ContentText t : SpaceChar : SpaceChar : SpaceChar : SpaceChar : ts) q = sr (PMD (Code t) : ts) q
 sr (ContentText t : Tab x : ts) q = sr (PMD (Code t) : ts) q
 sr (BackTick : ContentText t : BackTick : ts) q = sr (PMD (Code t) : ts) q
+sr (PMD (Para t) : PMD (Code x) : PMD (Para t1) : ts) q = sr (PMD (Para (t1 ++ "<code>" ++ x ++ "</code> " ++ t)) : ts) q
 --creating an image
 sr (RPar : ContentText t : LPar : RBra : ContentText tx : LBra : Exclamation : ts) q = sr (PMD (Image tx t) : ts) q
 --creating horizontal rules
@@ -199,6 +202,7 @@ sr (RPar : ContentText t : LPar : RBra : ContentText tx : LBra : ts) q = sr (PMD
 sr (Err e : ts) q = [Err e]
 --case for lone contenttext, going to make the assumption user wants a paragraph, otherwise it would be unhandled
 sr (ContentText t : []) q = sr (PMD (Para t) : []) q
+sr (ContentText t : SpaceChar : ts) q = sr (PMD (Para t) : ts ) q
 sr ts (x:q) = sr (x:ts) q
 sr ts [] = ts
 
@@ -239,6 +243,8 @@ converter s (PMD (Image tx t) : xs) = s ++ "<img src=\"" ++ t ++ "\" alt=\"" ++ 
 converter s (PMD (HorizontalRule) : xs) = s ++ "<hr>\n" ++ converter s xs
 converter s (NewLine : xs) = converter s xs
 converter s (SpaceChar : xs) = converter s xs
+converter s (Ast : xs) = converter s xs
+converter s (UndScore : xs) = converter s xs
 
 --creates the outside braces that indicate this is an unordered list
 convertUnorderedList :: [Elements] -> String

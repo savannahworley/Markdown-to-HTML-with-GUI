@@ -111,11 +111,11 @@ sr :: [Token] -> [Token] -> [Token]
 
 --creating bold text
 sr (Ast : Ast : PMD (Para t) : Ast : Ast : ts) q = sr (PMD (Bold t) : ts) q
-sr (Ast : Ast : ContentText t : Ast : Ast : ts) q = sr (PMD (Bold t) : ts) q 
+sr (Ast : Ast : ContentText t : SpaceChar : Ast : Ast : ts) q = sr (PMD (Bold t) : ts) q 
 sr (UndScore : UndScore : ContentText t : UndScore : UndScore : ts) q = sr (PMD (Bold t) : ts) q 
 --creating italic text
 sr (Ast : ContentText t : Ast : ts) q = sr (PMD (Italic t) : ts) q 
-sr (UndScore : ContentText t : UndScore : ts) q = sr (PMD (Italic t) : ts) q 
+sr (UndScore : SpaceChar : ContentText t : SpaceChar : UndScore : ts) q = sr (PMD (Italic t) : ts) q 
 --creating bold and italic combo
 sr (Ast : Ast : Ast : ContentText t : Ast : Ast : Ast : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
 sr (UndScore : UndScore : UndScore : ContentText t : UndScore : UndScore : UndScore : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
@@ -202,7 +202,7 @@ sr (RPar : ContentText t : LPar : RBra : ContentText tx : LBra : ts) q = sr (PMD
 sr (Err e : ts) q = [Err e]
 --case for lone contenttext, going to make the assumption user wants a paragraph, otherwise it would be unhandled
 sr (ContentText t : []) q = sr (PMD (Para t) : []) q
-sr (ContentText t : SpaceChar : ts) q = sr (PMD (Para t) : ts ) q
+--sr (ContentText t : SpaceChar : ts) q = sr (PMD (Para t) : ts ) q
 sr ts (x:q) = sr (x:ts) q
 sr ts [] = ts
 
@@ -226,10 +226,12 @@ converter s (PMD (H3 t) : xs) = s ++ "<h3>" ++ t ++ "</h3>\n" ++ converter s xs
 converter s (PMD (H4 t) : xs) = s ++ "<h4>" ++ t ++ "</h4>\n" ++ converter s xs
 converter s (PMD (H5 t) : xs) = s ++ "<h5>" ++ t ++ "</h5>\n" ++ converter s xs
 converter s (PMD (H6 t) : xs) = s ++ "<h6>" ++ t ++ "</h6>\n" ++ converter s xs
-converter s (PMD (Para t) : PMD (Italic t1) : PMD (Para t2) : xs) = s ++ "<p>" ++ t ++ "<i>" ++ t1 ++ " " ++ "</i>" ++ t2 ++ "</p>"
-converter s (PMD (Para t) : PMD (Bold t1) : PMD (Para t2) : xs) = s ++ "<p>" ++ t ++ "<b>" ++ t1 ++ " " ++ "</b>" ++ t2 ++ "</p>"
-converter s (PMD (Para t) : PMD (BoldAndItalic t1) : PMD (Para t2) : xs) = s ++ "<p>" ++ t ++ "<i><b>" ++ t1 ++ " " ++ "</b></i>" ++ t2 ++ "</p>"
-converter s (PMD (Para t) : xs) = s ++ "<p>" ++ t ++ "</p>\n" ++ converter s xs 
+--converter s (PMD (Para t) : PMD (Italic t1) : PMD (Para t2) : xs) = s ++ "<p>" ++ t ++ "<i>" ++ t1 ++ " " ++ "</i>" ++ t2 ++ "</p>" ++ converter s xs
+--converter s (PMD (Para t) : PMD (Bold t1) : PMD (Para t2) : xs) = s ++ "<p>" ++ t ++ "<b>" ++ t1 ++ " " ++ "</b>" ++ t2 ++ "</p>" ++ converter s xs
+--converter s (PMD (Para t) : PMD (BoldAndItalic t1) : PMD (Para t2) : xs) = s ++ "<p>" ++ t ++ "<i><b>" ++ t1 ++ " " ++ "</b></i>" ++ t2 ++ "</p>" ++ converter s xs
+--converter s (PMD (Para t) : xs) = s ++ "<p>" ++ t ++ "</p>\n" ++ converter s xs
+converter s (PMD (Para t) : xs) = s ++ x ++ converter s (drop y xs) where
+    (x,y) = convertPara (PMD (Para t) : xs)
 converter s (PMD (LnBreak) : xs) = s ++ "<br>\n" ++ converter s xs 
 converter s (PMD (Bold t) : xs) = s ++ "<b>" ++ t ++ "</b>" ++ converter s xs 
 converter s (PMD (Italic t) : xs) = s ++ "<i>" ++ t ++ "</i>" ++ converter s xs 
@@ -244,7 +246,7 @@ converter s (PMD (HorizontalRule) : xs) = s ++ "<hr>\n" ++ converter s xs
 converter s (NewLine : xs) = converter s xs
 converter s (SpaceChar : xs) = converter s xs
 converter s (Ast : xs) = converter s xs
-converter s (UndScore : xs) = converter s xs
+--converter s (UndScore : xs) = converter s xs
 
 --creates the outside braces that indicate this is an unordered list
 convertUnorderedList :: [Elements] -> String
@@ -260,6 +262,20 @@ convertListElement (ListItem t) = "<li>" ++ t ++ "</li>\n"
 convertListElement (OrderedList _ nestedElements) = convertOrderedList nestedElements
 convertListElement (UnorderedList _ nestedElements) = convertUnorderedList nestedElements
 
+convertPara :: [Token] -> (String, Int)
+convertPara (PMD (Para t) : xs) = ("<p>" ++ t ++ x, 1 + y) where 
+    (x,y) = convertPara xs
+convertPara (PMD (Bold t) : xs) = ("<b>" ++ t ++ "</b>" ++ x, 1 + y) where 
+    (x, y) = convertPara xs
+convertPara (PMD (Italic t) : xs) = ("<i>" ++ t ++ "</i>" ++ x, 1 + y) where 
+    (x,y) = convertPara xs
+convertPara (PMD (BoldAndItalic t) : xs) = ("<i><b>" ++ t ++ "</b></i>" ++ x, 1 + y) where 
+    (x,y) = convertPara xs
+convertPara (ContentText t : xs) = (t ++ x, 1 + y) where 
+    (x,y) = convertPara xs
+convertPara (SpaceChar : xs) = ("" ++ x, 1 + y) where
+    (x,y) = convertPara xs
+convertPara _ = ("</p>", 0)
 
 runConverter :: String -> String
 runConverter s = 

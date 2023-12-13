@@ -126,13 +126,13 @@ sr (Ast : Ast : UndScore : ContentText t : UndScore : Ast : Ast : ts) q = sr (PM
 
 --ordered list code
 --nesting ordered list in unordered list
-sr (ContentText t : NumLiteral _ : Tab x : NewLine : PMD (UnorderedList x1 xs) : ts) q = sr (PMD (UnorderedList x1 (xs ++ [OrderedList x [ListItem t]])) : ts) q
+sr (ContentText t : NumLiteral _ : Tab x : NewLine : PMD (UnorderedList x1 xs) : ts) q = sr (PMD (UnorderedList x1 (combineLists (xs ++ [OrderedList x [ListItem t]]))) : ts) q
 --case for orderedlists nested inside orderedlists
 sr (ContentText t : NumLiteral _ : Tab x1 : NewLine : PMD (OrderedList x xs) : ts) q | x == x1 = sr (PMD (OrderedList x (xs ++ [ListItem t])) : ts) q
-    | otherwise = sr (PMD (OrderedList x (indentListHelper (OrderedList x1 [ListItem t]) xs)) : ts) q
+    | otherwise = sr (PMD (OrderedList x (combineLists (indentListHelper (OrderedList x1 [ListItem t]) xs))) : ts) q
 --combining orderedlists that are parsed, same indentation, and occur together
 sr (PMD (OrderedList i s2) : NewLine : PMD(OrderedList i1 xs) : ts) q | i == i1 = sr (PMD (OrderedList i1 (xs ++ s2)): ts) q
-    | otherwise = sr (PMD (OrderedList i1 (xs ++ indentListHelper (OrderedList i s2) xs)) : ts) q
+    | otherwise = sr (PMD (OrderedList i1 (combineLists (indentListHelper (OrderedList i s2) xs))) : ts) q
 --adding a listitem to an orderedlist
 sr (ContentText t : NewLine : PMD(OrderedList i1 xs) : ts) q = sr (PMD (OrderedList i1 (xs ++ [ListItem t])): ts) q
 --creating an orderedlist
@@ -141,10 +141,10 @@ sr (ContentText t : NumLiteral x : ts) q = sr (PMD (OrderedList 0 [ListItem t]) 
 sr (PMD (OrderedList i s2) : Tab x1 : NewLine : NumLiteral _ : NewLine : PMD (OrderedList i1 s1) : ts) q = sr (PMD (OrderedList i1 (s1 ++ [OrderedList x1 s2])) : ts) q
 
 --unordered list code
---nesting unordered list in unordered list with the different constructors for an unorderedlist
-sr (ContentText t : Dash : Tab x : NewLine : PMD (OrderedList x1 xs) : ts) q = sr (PMD (OrderedList x1 (xs ++ [UnorderedList x [ListItem t]])) : ts) q
-sr (ContentText t : Ast : Tab x : NewLine : PMD (OrderedList x1 xs) : ts) q = sr (PMD (OrderedList x1 (xs ++ [UnorderedList x [ListItem t]])) : ts) q
-sr (ContentText t : Plus : Tab x : NewLine : PMD (OrderedList x1 xs) : ts) q = sr (PMD (OrderedList x1 (xs ++ [UnorderedList x [ListItem t]])) : ts) q
+--nesting unordered list in ordered list with the different constructors for an unorderedlist
+sr (ContentText t : Dash : Tab x : NewLine : PMD (OrderedList x1 xs) : ts) q = sr (PMD (OrderedList x1 (combineLists (xs ++ [UnorderedList x [ListItem t]]))) : ts) q
+sr (ContentText t : Ast : Tab x : NewLine : PMD (OrderedList x1 xs) : ts) q = sr (PMD (OrderedList x1 (combineLists (xs ++ [UnorderedList x [ListItem t]]))) : ts) q
+sr (ContentText t : Plus : Tab x : NewLine : PMD (OrderedList x1 xs) : ts) q = sr (PMD (OrderedList x1 (combineLists (xs ++ [UnorderedList x [ListItem t]]))) : ts) q
 --cases for creating or adding to a nested unorderedlist
 sr (ContentText t : Dash : Tab x1 : NewLine : PMD (UnorderedList x xs) : ts) q | x == x1 = sr (PMD (UnorderedList x (xs ++ [ListItem t])) : ts) q
     | otherwise = sr (PMD (UnorderedList x (indentListHelper2 (UnorderedList x1 [ListItem t]) xs)) : ts) q
@@ -218,6 +218,16 @@ indentListHelper2 :: Elements -> [Elements] -> [Elements]
 indentListHelper2 (UnorderedList x xs) ((UnorderedList y ys) : zs) = if x == y then [UnorderedList y (ys ++ xs)] ++ zs else (UnorderedList y ys) : zs ++ [UnorderedList x xs]
 indentListHelper2 (UnorderedList x xs) ys = ys ++ [UnorderedList x xs]
 
+combineLists :: [Elements] -> [Elements]
+combineLists ((OrderedList x t) : (OrderedList x1 t1) : xs) | x == x1 = [(OrderedList x (t ++ t1))] ++ combineLists xs
+    | x1 > x = [OrderedList x (t ++ [OrderedList x1 t1])] ++ combineLists xs
+combineLists ((UnorderedList x t) : (UnorderedList x1 t1) : xs) | x == x1 = [(UnorderedList x (t ++ t1))] ++ combineLists xs
+    | x1 > x = [UnorderedList x (t ++ [UnorderedList x1 t1])] ++ combineLists xs
+combineLists ((OrderedList x t) : (UnorderedList x1 t1) : xs) | x1 > x = [OrderedList x (t ++ [UnorderedList x1 t1])]
+combineLists ((UnorderedList x t) : (OrderedList x1 t1) : xs) | x1 > x = [UnorderedList x (t ++ [OrderedList x1 t1])]
+combineLists (ListItem t : xs) = [ListItem t] ++ combineLists xs 
+combineLists xs = xs
+
 --parsed markdown needs to be reversed before being converted, comes out reversed from parser
 --bold and italic tags should be 
 converter :: String -> [Token] -> String 
@@ -240,8 +250,8 @@ converter s (PMD (Italic t) : xs) = s ++ "<i>" ++ t ++ "</i>" ++ converter s xs
 converter s (PMD (BoldAndItalic t) : xs) = s ++ "<i><b>" ++ t ++ "</b></i>" ++ converter s xs 
 converter s (PMD (Blockquote t) : xs) = s ++ "<blockquote>" ++ t ++ "</blockquote>" ++converter s xs 
 converter s (PMD (Code t) : xs) = s ++ "<code>" ++ t ++ "</code>" ++ converter s xs 
-converter s (PMD (UnorderedList _ elements) : xs) = converter (s ++ convertUnorderedList elements) xs
-converter s (PMD (OrderedList _ elements) : xs) = converter (s ++ convertOrderedList elements) xs
+converter s (PMD (UnorderedList x elements) : xs) = converter (s ++ convertUnorderedList x elements) xs
+converter s (PMD (OrderedList x elements) : xs) = converter (s ++ convertOrderedList x elements) xs
 converter s (PMD (Link tx t) : xs) = s ++ "<a href=\"" ++ t ++ "\">" ++ tx ++ "</a>" ++ converter s xs
 converter s (PMD (Image tx t) : xs) = s ++ "<img src=\"" ++ t ++ "\" alt=\"" ++ tx ++ "\">" ++ "</img>" ++ converter s xs
 converter s (PMD (HorizontalRule) : xs) = s ++ "<hr>\n" ++ converter s xs
@@ -252,18 +262,29 @@ converter s (Dot : xs) = converter s xs
 converter s (UndScore : xs) = converter s xs
 
 --creates the outside braces that indicate this is an unordered list
-convertUnorderedList :: [Elements] -> String
-convertUnorderedList elements = "<ul>\n" ++ concatMap convertListElement elements ++ "</ul>"
+convertUnorderedList :: Int -> [Elements] -> String
+convertUnorderedList x elements = "<ul>\n" ++ convertListElement x elements ++ createTabs x ++ "</ul>\n"
 
 --creates the outside braces that indicate this is an ordered list
-convertOrderedList :: [Elements] -> String
-convertOrderedList elements = "<ol>\n" ++ concatMap convertListElement elements ++ "</ol>"
+convertOrderedList :: Int -> [Elements] -> String
+convertOrderedList x elements = "<ol>\n" ++ convertListElement x elements ++ createTabs x ++ "</ol>\n"
 
 --traverses through the list and marks each element as a part of the list within the undordered/ordered list braces
-convertListElement :: Elements -> String
-convertListElement (ListItem t) = "<li>" ++ t ++ "</li>\n"
-convertListElement (OrderedList _ nestedElements) = convertOrderedList nestedElements
-convertListElement (UnorderedList _ nestedElements) = convertUnorderedList nestedElements
+convertListElement :: Int -> [Elements] -> String
+convertListElement x1 (ListItem t : OrderedList x t1 : ts) = (createTabs x1 ++ "<li>" ++ t ++ "\n" ++ createTabs x ++ convertOrderedList x t1) 
+    ++ createTabs x1 ++ "</li>\n" ++ convertListElement x1 ts
+convertListElement x1 (ListItem t : UnorderedList x t1 : ts) = (createTabs x1 ++ "<li>" ++ t ++ "\n" ++ createTabs x ++ convertUnorderedList x t1) 
+    ++ createTabs x1 ++ "</li>\n" ++ convertListElement x1 ts
+convertListElement x (ListItem t : ts) = createTabs x ++ "<li>" ++ t ++ "</li>\n" ++ convertListElement x ts
+convertListElement x1 (OrderedList x t1 : ts) = convertOrderedList x t1 ++ convertListElement x1 ts
+convertListElement x1 (UnorderedList x t1 : ts) = convertUnorderedList x t1 ++ convertListElement x1 ts
+convertListElement _ [] = []
+-- convertListElement (ListItem t) = "<li>" ++ t ++ "</li>\n"
+-- convertListElement (OrderedList _ nestedElements) = convertOrderedList nestedElements
+-- convertListElement (UnorderedList _ nestedElements) = convertUnorderedList nestedElements
+
+createTabs :: Int -> String
+createTabs x = ['\t' | x <- [1..x]]
 
 convertPara :: [Token] -> (String, Int)
 convertPara (PMD (Para t) : xs) = ("<p>" ++ t ++ x, 1 + y) where 

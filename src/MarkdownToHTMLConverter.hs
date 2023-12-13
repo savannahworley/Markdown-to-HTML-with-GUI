@@ -102,6 +102,7 @@ parser :: [Token] -> Either [Token] String
 parser s = case result of
     (PMD e) : xs -> Left (PMD e : xs)
     (NewLine : xs) -> Left (NewLine : xs)
+    (ContentText t : xs) -> Left (ContentText t : xs)
     [Err e] -> Right e
     _ -> Right $ "Parse error: " ++ show s
     where
@@ -116,7 +117,7 @@ sr (UndScore : UndScore : ContentText t : UndScore : UndScore : ts) q = sr (PMD 
 --creating italic text
 sr (Ast : ContentText t : Ast : ts) q = sr (PMD (Italic t) : ts) q 
 sr (Ast : ContentText t : SpaceChar : Ast : ts) q = sr (PMD (Italic t) : ts) q
-sr (UndScore : SpaceChar : ContentText t : SpaceChar : UndScore : ts) q = sr (PMD (Italic t) : ts) q 
+sr (UndScore : ContentText t : SpaceChar : UndScore : ts) q = sr (PMD (Italic t) : ts) q 
 --creating bold and italic combo
 sr (Ast : Ast : Ast : ContentText t : Ast : Ast : Ast : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
 sr (UndScore : UndScore : UndScore : ContentText t : UndScore : UndScore : UndScore : ts) q = sr (PMD (BoldAndItalic t) : ts) q 
@@ -248,7 +249,7 @@ converter s (NewLine : xs) = converter s xs
 converter s (SpaceChar : xs) = converter s xs
 converter s (Ast : xs) = converter s xs
 converter s (Dot : xs) = converter s xs
---converter s (UndScore : xs) = converter s xs
+converter s (UndScore : xs) = converter s xs
 
 --creates the outside braces that indicate this is an unordered list
 convertUnorderedList :: [Elements] -> String
@@ -276,6 +277,10 @@ convertPara (PMD (BoldAndItalic t) : xs) = ("<i><b>" ++ t ++ "</b></i>" ++ x, 1 
 convertPara (ContentText t : xs) = (t ++ x, 1 + y) where 
     (x,y) = convertPara xs
 convertPara (SpaceChar : xs) = ("" ++ x, 1 + y) where
+    (x,y) = convertPara xs
+convertPara (Ast : xs) = ("" ++ x, 1 + y) where
+    (x,y) = convertPara xs
+convertPara (UndScore : xs) = ("" ++ x, 1 + y) where
     (x,y) = convertPara xs
 convertPara _ = ("</p>", 0)
 

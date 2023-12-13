@@ -12,6 +12,7 @@ For more information on basic Markdown syntax, check https://www.markdownguide.o
 
 Some important syntax notes:
 
+- The GUI will convert the entered text with the "enter" key, so use shift + enter to get a newline in the GUI.
 - No space between list and header identifiers and the content text.
 - Space between the asterisks and content text for bold selections.
 - When making an element bold and italic, use two asterisks and an underline \*\*\_ \_\*\*
